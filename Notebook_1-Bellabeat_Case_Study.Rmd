@@ -1,0 +1,315 @@
+---
+title: "Bellabeat Case Study"
+author: "Jonathan Moffa"
+date: "2022-12-04"
+---
+
+# Case Study: How Can a Wellness Technology Company Play It Smart?
+
+## The Business Task
+This case study looks at how Bellabeat, a wellness technology company, can look for growth opportunities by examining existing smart device data. The goal of this case study is to determine trends with smart device usage, and to use insights gained from these trends to improve the user experience. In doing so, this will highlight some opportunities for growth within the company.
+
+## About the Data
+### Datasets used (with sources)
+The data used for this case study includes data collected from about thirty consenting FitBit users, and includes various metrics for physical activity, as well as weight, sleep, and heart rate data. This data was collected by Furberg, Robert; Brinton, Julia; Keating, Michael; and Ortiz, Alexa. The original source of the data can be found [here](https://zenodo.org/record/53894#.YMoUpnVKiP9). A copy of the datasets for downloading can be found [here](https://www.kaggle.com/datasets/arashnic/fitbit).
+
+### How can the data be applied to Bellabeat?
+The wellness data provided above can be utilized by proxy to draw conclusion about Bellabeat users. The data collected can also help improve Bellabeat's membership service, which includes personalized recommendations to subscribers about their health habits.
+
+### Data limitations
+There are a few limitations with the data that should be addressed before I begin. For one, there is a relatively small participant sample size. The amount of data collected allows us to draw some useful conclusions about Bellabeat users, however. In addition, some datasets do not include all of the participants. This is most notable with the weight log dataset, which includes less than one third of the total participants. Finally, the data was collected in 2016, so it may not be as current as it could be.
+
+## Preparing and Cleaning the Data
+### Setting up my environment
+I am using the tidyverse and skimr packages to complete this case study, so I will install and load these now:
+
+```{r Loading packages}
+library(tidyverse)
+library(skimr)
+```
+
+### Import some of the data to create data frames
+First, I will import some of the data to create data frames:
+
+```{r Import .csv files to data frames}
+cwd <- getwd()
+daily_activity <- read_csv(paste(cwd, "/data/dailyActivity_merged.csv", sep=""))
+day_sleep <- read_csv(paste(cwd, "/data/sleepDay_merged.csv", sep=""))
+hourly_calories <- read_csv(paste(cwd, "/data/hourlyCalories_merged.csv", sep=""))
+hourly_steps <- read_csv(paste(cwd, "/data/hourlySteps_merged.csv", sep=""))
+```
+
+### Review data frames
+Next, let's get some useful information about our data frames, and verify the data's integrity. This information will include a glimpse of the data frames, the number of participants included in each data frame, and other useful information for data cleaning and verification.
+
+#### Review daily_activity data frame
+This data frame includes information about various aspects of daily activity, such as steps, distance, calories burned, and data regarding different levels of activity, from very active to sedentary:
+
+```{r Review daily_activity data frame}
+glimpse(daily_activity)
+```
+
+```{r # of participants in daily_activity}
+n_distinct(daily_activity$Id)
+```
+
+```{r Data cleaning summary for daily_activity}
+skim_without_charts(daily_activity)
+```
+
+#### Review day_sleep data frame
+This data frame includes information about time asleep, time in bed, and number of times slept in one day:
+
+```{r Review day_sleep data frame}
+glimpse(day_sleep)
+```
+
+```{r # of participants in day_sleep}
+n_distinct(day_sleep$Id)
+```
+
+```{r Data cleaning summary for day_sleep}
+skim_without_charts(day_sleep)
+```
+
+#### Review hourly_calories data frame
+This data frame includes an hourly breakdown of calories burned:
+
+```{r Review hourly_calories data frame}
+glimpse(hourly_calories)
+```
+
+```{r # of participants in hourly_calories}
+n_distinct(hourly_calories$Id)
+```
+
+```{r Data cleaning summary for hourly_calories}
+skim_without_charts(hourly_calories)
+```
+
+#### Review hourly_steps data frame
+This data frame includes an hourly breakdown of number of steps taken:
+
+```{r Review hourly_steps data frame}
+glimpse(hourly_steps)
+n_distinct(hourly_steps$Id)
+skim_without_charts(hourly_steps)
+```
+
+```{r # of participants in hourly_steps}
+n_distinct(hourly_steps$Id)
+```
+
+```{r Data cleaning summary for hourly_steps}
+skim_without_charts(hourly_steps)
+```
+
+### Clean and merge data frames
+While it appears that the data has integrity, there are still a few things that can be cleaned up in these data frames. For one, in the sleep_day data frame, it would appear that the time for every date in SleepDay is 12:00:00 AM. The time asleep in TotalMinutesAsleep and TotalTimeInBed also appears to be recorded in minutes. I will remove the times and convert minutes into hours to help with my analysis:
+
+```{r Clean day_sleep data frame}
+day_sleep_cleaned <- day_sleep %>%
+  separate(SleepDay, into=c('SleepDate', 'SleepTime'), sep=' ') %>%
+  mutate(TotalHoursAsleep=TotalMinutesAsleep/60) %>%
+  mutate(TotalHoursInBed=TotalTimeInBed/60) %>%
+  select(Id, SleepDate, TotalSleepRecords, TotalHoursAsleep, TotalHoursInBed)
+```
+
+In the hourly_calories data frame, the dates and times can be separated as well:
+
+```{r Clean hourly_calories data frame}
+hourly_calories_cleaned <- hourly_calories %>%
+  separate(ActivityHour, into=c('Date', 'HourTemp', 'AMorPM'), sep=' ') %>%
+  unite('Hour', c('HourTemp', 'AMorPM'), sep=' ')
+```
+
+This also applies to the hourly_steps data frame:
+
+```{r Clean hourly_steps data frame}
+hourly_steps_cleaned <- hourly_steps %>%
+  separate(ActivityHour, into=c('Date', 'HourTemp', 'AMorPM'), sep=' ') %>%
+  unite('Hour', c('HourTemp', 'AMorPM'), sep=' ')
+```
+
+To further assist with analysis, we can also merge and clean the two hourly data frames into hourly_activity_merged:
+
+```{r Merge and clean hourly data frames}
+hourly_activity_merged <- data.frame(hourly_steps_cleaned, hourly_calories_cleaned)
+hourly_activity_cleaned <- hourly_activity_merged %>%
+  select(Id, Date, Hour, StepTotal, Calories)
+```
+
+I will also merge the daily activity and sleep data frames to investigate more trends:
+
+```{r Merge daily_activity and day_sleep data frames}
+activity_sleep_merged <- merge(daily_activity, day_sleep_cleaned, by='Id')
+```
+
+Let's take a look at the cleaned data frames!
+
+```{r Review sleep_day_cleaned data frame}
+glimpse(day_sleep_cleaned)
+glimpse(hourly_activity_cleaned)
+```
+
+## Analyze Data
+Now that all of the data I am using is prepared for analysis, I will gather some quick summary statistics of these data frames now:
+
+```{r Summary of daily_activity}
+daily_activity %>%
+  select(TotalSteps,
+         TotalDistance,
+         VeryActiveDistance,
+         ModeratelyActiveDistance,
+         LightActiveDistance,
+         SedentaryActiveDistance,
+         VeryActiveMinutes,
+         FairlyActiveMinutes,
+         LightlyActiveMinutes,
+         SedentaryMinutes,
+         Calories) %>%
+  summary()
+```
+
+```{r Summary of day_sleep_cleaned}
+day_sleep_cleaned %>%
+  select(TotalSleepRecords, TotalHoursAsleep, TotalHoursInBed) %>%
+  summary()
+```
+
+```{r Summary of hourly_activity_cleaned}
+hourly_activity_cleaned %>%
+  select(StepTotal, Calories) %>%
+  summary()
+```
+
+One interesting thing to note about the data from the summaries above would be the outliers in high levels of activity. This skews averages toward the max in these cases.
+
+## Visualize Data
+Now is the time to plot some of the trends found with the data. While gathering summary statistics reveal some interesting information about the data, these visualizations will primarily reveal insights about relationships between different variables.
+
+### Daily step count vs. Calories burned
+The first plot describes the correlation of daily step count and calories burned:
+
+```{r Plot of Step Count vs. Calories Burned (Daily)}
+ggplot(data=daily_activity)+
+  geom_point(mapping=aes(x=TotalSteps, y=Calories))+
+  geom_smooth(mapping=aes(x=TotalSteps, y=Calories))+
+  labs(title="Step Count vs. Calories Burned",
+       subtitle="Determining trends in daily activity",
+       x="Step Count",
+       y="Calories Burned")
+```
+
+### Hourly step count vs. Calories burned
+The next plot takes a closer look at these variables, describing the correlation between hourly step count and calories burned:
+
+```{r Plot of Step Count vs. Calories Burned (Hourly)}
+ggplot(data=hourly_activity_cleaned)+
+  geom_jitter(mapping=aes(x=StepTotal, y=Calories))+
+  geom_smooth(mapping=aes(x=StepTotal, y=Calories))+
+  labs(title="Step Count vs. Calories Burned",
+       subtitle="Hourly activity: A closer look",
+       x="Step Count",
+       y="Calories Burned")
+```
+
+### Daily total distance vs. Calories burned
+Is there a trend between the total distance in a day and calories burned?
+
+```{r Plot of Total Distance vs. Calories Burned}
+ggplot(data=daily_activity)+
+  geom_point(mapping=aes(x=TotalDistance, y=Calories))+
+  geom_smooth(mapping=aes(x=TotalDistance, y=Calories))+
+  labs(title="Total Distance vs. Calories Burned",
+       subtitle="Determining trends in daily activity",
+       x="Total Distance (miles)",
+       y="Calories Burned")
+```
+
+### Daily step count vs. Total distance
+I would expect that the daily step count and total daily distance would be very closely related, let's look at these now:
+
+```{r Plot of Step Count vs. Total Distance}
+ggplot(data=daily_activity)+
+  geom_point(mapping=aes(x=TotalSteps, y=TotalDistance))+
+  geom_smooth(mapping=aes(x=TotalSteps, y=TotalDistance))+
+  labs(title="Step Count vs. Total Distance",
+       subtitle="Determining trends in daily activity",
+       x="Step Count",
+       y="Total Distance (miles)")
+```
+
+### Daily step count vs. Very active distance
+In the above plot, we can see that there are several points after 15k steps where distance is more above the average in relation to the data points below 15k steps. Let's see if high activity levels could account for these outliers:
+
+```{r Plot of Step Count vs. Very Active Distance}
+ggplot(data=daily_activity)+
+  geom_point(mapping=aes(x=TotalSteps, y=VeryActiveDistance))+
+  geom_smooth(mapping=aes(x=TotalSteps, y=VeryActiveDistance))+
+  labs(title="Step Count vs. Very Active Distance",
+       subtitle="A closer look at level of activity",
+       x="Step Count",
+       y="Very Active Distance (miles)")
+```
+
+As the plot above shows, as the daily step count goes up, the tendency for very active distance goes up significantly, which not only shows the association between these two variables, but also helps explain why the overall total distance was slightly higher in the previous plot.
+
+### Very active distance vs. Calories burned
+Is very active distance related to calories burned?
+
+```{r Plot of Very Active Distance vs. Calories Burned}
+ggplot(data=daily_activity)+
+  geom_point(mapping=aes(x=VeryActiveDistance, y=Calories))+
+  geom_smooth(mapping=aes(x=VeryActiveDistance, y=Calories))+
+  labs(title="Very Active Distance vs. Calories Burned",
+       subtitle="Determining trends in daily activity",
+       x="Very Active Distance (miles)",
+       y="Calories Burned")
+```
+
+There does appear to be some correlation between high activity levels and calories burned, though there also appears to be a slight dip in that correlation from about 1-2.5 miles.
+
+### Hours asleep vs. Hours in bed
+Finally, let's take a look at the sleep data. I would expect that the amount of hours asleep would be related to hours in bed, so let's check these now:
+
+```{r Plot of Hours Asleep vs. Hours in Bed}
+ggplot(data=day_sleep_cleaned)+
+  geom_point(mapping=aes(x=TotalHoursAsleep,
+                         y=TotalHoursInBed))+
+  geom_smooth(mapping=aes(x=TotalHoursAsleep, y=TotalHoursInBed))+
+  labs(title="Hours Asleep vs. Hours in Bed",
+       subtitle="Determining sleep trends",
+       x="Hours Asleep",
+       y="Hours in Bed")
+```
+
+It would appear that while there is a correlation between hours asleep and hours in bed, there are also some outlier data points, where the hours in bed are significantly higher than the hours asleep.
+
+### Hours asleep vs. Hours in bed (Plus calories burned)
+How are these aforementioned outliers related to calories burned? Let's investigate to see the calories burned within this group:
+
+```{r Plot of Hours Asleep vs. Hours In Bed (Plus Calories Burned)}
+ggplot(data=activity_sleep_merged)+
+  geom_point(mapping=aes(x=TotalHoursAsleep, y=TotalHoursInBed, color=Calories))+
+  geom_smooth(mapping=aes(x=TotalHoursAsleep, y=TotalHoursInBed, color=Calories))+
+  labs(title="Hours Asleep vs. Hours in Bed",
+       subtitle="Examining calories burned",
+       x="Hours Asleep",
+       y="Hours in Bed")+
+  guides(color=guide_legend(title="Calories Burned"))+
+  scale_color_gradient(low="light blue", high="dark blue")
+```
+
+It would appear that all of the outliers where users did not sleep as much, but spent more time in bed, also did not burn as many calories.
+
+## Recommended Action
+Based on the findings above, I could recommend two different growth opportunities for Bellabeat:
+
+* Enable Bellabeat users to set goals for physical activity
+
+This can improve the overall user experience of all Bellabeat users. Encouraging walking more, or increasing high-intensity exercise, can engage users by enabling them to burn more calories and live a healthier lifestyle.
+
+* Use findings to optimize Bellabeat membership service
+
+Once Bellabeat users are generally engaged using smart devices, using a more optimized membership service can further engage subscribers and allow for further company growth. For example, if subscribers get less sleep and spend more time in bed, Bellabeat can offer personalized recommendations to encourage a healthier lifestyle to those subscribers based on the findings above.
